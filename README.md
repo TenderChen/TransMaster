@@ -11,3 +11,10 @@
 C++ Qt中我想加一个按钮，它展示的是一个全局快捷键，记录在配置文件中，启动时读取并调用win32API注册全局快捷键；点击按钮时可以捕获新输入的全局快捷键进行替换，应该怎么搞? GPT:QSettings RegisterHotKey UnregisterHotKey QPushButton QKeyEvent
 
 难绷，逻辑卡住了。通过窗口的边界判断窗口是否被完全覆盖在大多数复杂情况下不能正常工作，使用区域相关的API也会碰到透明度和层叠等问题。考虑分屏多窗口和浮动窗口下的单层覆盖模式逻辑实现遇到了极大的问题。
+
+先考虑调节窗口透明度的方案好了，GPT提供了 SetLayeredWindowAttributes/DirectComposition API等方法，就用简单粗暴的SetLayeredWindowAttributes好了。
+
+windows中我想在窗口获取焦点后调节它的透明度，最简单的api实现方案是什么
+
+windows中我想实现操作系统在其它的窗口程序获得焦点后通知我针对它触发一系列操作，用C++ QT在mainwindow中如何实现
+这个和使用系统全局钩子监听焦点事件相比有什么优劣

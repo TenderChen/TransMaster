@@ -6,104 +6,142 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>400</height>
+    <width>367</width>
+    <height>280</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>TransMaster</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <widget class="QWidget" name="gridLayoutWidget">
-    <property name="geometry">
-     <rect>
-      <x>170</x>
-      <y>60</y>
-      <width>172</width>
-      <height>116</height>
-     </rect>
-    </property>
-    <layout class="QGridLayout" name="gridLayout">
-     <item row="1" column="0">
-      <widget class="QLabel" name="label_window">
+   <layout class="QGridLayout" name="gridLayout">
+    <item row="0" column="1">
+     <widget class="QKeySequenceEdit" name="keySequenceEdit_mode">
+      <property name="maximumSequenceLength">
+       <longLong>1</longLong>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QLabel" name="label_window">
+      <property name="text">
+       <string>弹出界面</string>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="1">
+     <widget class="QSpinBox" name="spinBox_taskbar">
+      <property name="keyboardTracking">
+       <bool>false</bool>
+      </property>
+      <property name="suffix">
+       <string>%</string>
+      </property>
+      <property name="maximum">
+       <number>100</number>
+      </property>
+      <property name="singleStep">
+       <number>10</number>
+      </property>
+      <property name="value">
+       <number>100</number>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="0">
+     <widget class="QLabel" name="label_last">
+      <property name="text">
+       <string>前一个窗口</string>
+      </property>
+      <property name="textInteractionFlags">
+       <set>Qt::TextInteractionFlag::LinksAccessibleByKeyboard|Qt::TextInteractionFlag::LinksAccessibleByMouse|Qt::TextInteractionFlag::TextBrowserInteraction|Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
+      </property>
+     </widget>
+    </item>
+    <item row="4" column="0" colspan="2">
+     <widget class="QLabel" name="label_title">
+      <property name="text">
+       <string>窗口标题</string>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+      </property>
+      <property name="textInteractionFlags">
+       <set>Qt::TextInteractionFlag::LinksAccessibleByKeyboard|Qt::TextInteractionFlag::LinksAccessibleByMouse|Qt::TextInteractionFlag::TextBrowserInteraction|Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
+      </property>
+     </widget>
+    </item>
+    <item row="3" column="1">
+     <widget class="QSpinBox" name="spinBox_current">
+      <property name="keyboardTracking">
+       <bool>false</bool>
+      </property>
+      <property name="suffix">
+       <string>%</string>
+      </property>
+      <property name="maximum">
+       <number>100</number>
+      </property>
+      <property name="singleStep">
+       <number>10</number>
+      </property>
+      <property name="value">
+       <number>100</number>
+      </property>
+     </widget>
+    </item>
+    <item row="2" column="0">
+     <widget class="QLabel" name="label_taskbar">
+      <property name="text">
+       <string>任务栏透明度</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="0">
+     <widget class="QComboBox" name="comboBox_mode">
+      <item>
        <property name="text">
-        <string>弹出界面</string>
+        <string>不启用</string>
        </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QSpinBox" name="spinBox_taskbar">
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="singleStep">
-        <number>10</number>
-       </property>
-       <property name="value">
-        <number>100</number>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_taskbar">
+      </item>
+      <item>
        <property name="text">
-        <string>任务栏透明度</string>
+        <string>单层覆盖</string>
        </property>
-      </widget>
-     </item>
-     <item row="3" column="0">
-      <widget class="QLabel" name="label_last">
-       <property name="text">
-        <string>前一个窗口</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="1">
-      <widget class="QSpinBox" name="spinBox_current">
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="singleStep">
-        <number>10</number>
-       </property>
-       <property name="value">
-        <number>100</number>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="0">
-      <widget class="QComboBox" name="comboBox_mode">
-       <item>
-        <property name="text">
-         <string>不启用</string>
-        </property>
-       </item>
-       <item>
-        <property name="text">
-         <string>单层覆盖</string>
-        </property>
-       </item>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QKeySequenceEdit" name="keySequenceEdit_mode">
-       <property name="maximumSequenceLength">
-        <longLong>1</longLong>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="1">
-      <widget class="QKeySequenceEdit" name="keySequenceEdit_window">
-       <property name="maximumSequenceLength">
-        <longLong>1</longLong>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
+      </item>
+     </widget>
+    </item>
+    <item row="1" column="1">
+     <widget class="QKeySequenceEdit" name="keySequenceEdit_window">
+      <property name="maximumSequenceLength">
+       <longLong>1</longLong>
+      </property>
+     </widget>
+    </item>
+    <item row="5" column="0" colspan="2">
+     <widget class="QLabel" name="label_path">
+      <property name="text">
+       <string/>
+      </property>
+      <property name="wordWrap">
+       <bool>true</bool>
+      </property>
+      <property name="textInteractionFlags">
+       <set>Qt::TextInteractionFlag::LinksAccessibleByKeyboard|Qt::TextInteractionFlag::LinksAccessibleByMouse|Qt::TextInteractionFlag::TextBrowserInteraction|Qt::TextInteractionFlag::TextSelectableByKeyboard|Qt::TextInteractionFlag::TextSelectableByMouse</set>
+      </property>
+     </widget>
+    </item>
+   </layout>
   </widget>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
+ <tabstops>
+  <tabstop>spinBox_current</tabstop>
+  <tabstop>spinBox_taskbar</tabstop>
+  <tabstop>comboBox_mode</tabstop>
+  <tabstop>keySequenceEdit_mode</tabstop>
+  <tabstop>keySequenceEdit_window</tabstop>
+ </tabstops>
  <resources/>
  <connections/>
 </ui>

@@ -1,5 +1,6 @@
 ﻿#include "stdafx.h"
 #include "TransMaster.h"
+#include <optional>
 
 #include <Windows.h>
 #include <Psapi.h>
@@ -10,17 +11,25 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
 {
     ui.setupUi(this);
 
+    self = reinterpret_cast<HWND>(this->winId());
+
     shortCutBtns.reserve(2);
     shortCutBtns.append(ui.keySequenceEdit_mode);
     shortCutBtns.append(ui.keySequenceEdit_window);
 
-    ui.comboBox_mode;
-    ui.label_last;
-
     readSettings();
 
-    timer.setInterval(500);
-    connect(&timer, &QTimer::timeout, this, &TransMaster::work);
+    timerMode.setInterval(500);
+    connect(&timerMode, &QTimer::timeout, this, &TransMaster::workMode);
+
+    connect(&timerWindow, &QTimer::timeout, this, &TransMaster::workWindow);
+    timerWindow.start(500);
+
+    timerSbCurrent.setSingleShot(true);
+    connect(&timerSbCurrent, &QTimer::timeout, this, &TransMaster::sbCurrentTimer);
+
+    timerSbTaskbar.setSingleShot(true);
+    connect(&timerSbTaskbar, &QTimer::timeout, this, &TransMaster::sbTaskbarTimer);
 }
 
 TransMaster::~TransMaster()
@@ -33,9 +42,18 @@ void TransMaster::closeEvent(QCloseEvent* event)
     event->accept();
 }
 
+// 假设hWnd是你要操作的窗口句柄，bTransparency 0-255(不透明)
+void SetWindowTransparency(HWND hWnd, BYTE bTransparency) {
+    // 添加 WS_EX_LAYERED 扩展样式
+    SetWindowLong(hWnd, GWL_EXSTYLE, GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+    // 设置透明度
+    SetLayeredWindowAttributes(hWnd, 0, bTransparency, LWA_ALPHA);
+}
+
 bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)
 {
     MSG* msg = static_cast<MSG*>(message);
+
     if (msg->message == WM_HOTKEY)
     {
         // 检查是哪个热键被触发
@@ -45,7 +63,10 @@ bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintpt
             ui.comboBox_mode->setCurrentIndex((ui.comboBox_mode->currentIndex() + 1) % ui.comboBox_mode->count());
             break;
         case 1:  // 呼出窗口
+            workWindow();
             show();
+            raise();
+            activateWindow();
             break;
         default:
             break;
@@ -58,10 +79,10 @@ bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintpt
 void TransMaster::on_comboBox_mode_currentIndexChanged(int index)
 {
     if (index == 1) {
-        timer.start();
+        timerMode.start();
     }
     else {
-        timer.stop();
+        timerMode.stop();
     }
 }
 
@@ -184,15 +205,23 @@ UINT QtModifierToWinModifiers(Qt::KeyboardModifiers modifiers) {
 }
 
 void TransMaster::onShortCutChanged(const QKeySequence& keySequence, int id) {
-    HWND hwnd = reinterpret_cast<HWND>(this->winId());
-    UnregisterHotKey(hwnd, id);
+    UnregisterHotKey(self, id);
 
     if (!keySequence.isEmpty()) {
         auto k = keySequence[0];
         UINT winVirtualKey = QtKeyToWinVirtualKey(k.key());
         UINT winModifiers = QtModifierToWinModifiers(k.keyboardModifiers());
-        RegisterHotKey(hwnd, id, winModifiers, winVirtualKey);
+        RegisterHotKey(self, id, winModifiers, winVirtualKey);
     }
+}
+
+void TransMaster::changePath(const QString& path)
+{
+    if (path.isEmpty() || ui.label_path->text() == path) {
+        return;
+    }
+    ui.label_path->setText(path);
+    ui.spinBox_current->setValue(others.value(path, 100));
 }
 
 void TransMaster::on_keySequenceEdit_mode_keySequenceChanged(const QKeySequence& keySequence)
@@ -207,10 +236,44 @@ void TransMaster::on_keySequenceEdit_window_keySequenceChanged(const QKeySequenc
 
 void TransMaster::on_spinBox_current_valueChanged(int value)
 {
+    timerSbCurrent.start(300);
 }
 
 void TransMaster::on_spinBox_taskbar_valueChanged(int value)
 {
+    timerSbTaskbar.start(300);
+}
+
+void TransMaster::sbCurrentTimer()
+{
+    auto value = ui.spinBox_current->value();
+    qDebug() << "sbCurrentTimer " << value;
+    auto path = ui.label_path->text();
+    if (path.isEmpty()) {
+        return;
+    }
+    if(value == others.value(path, 100)) {
+        return;
+    }
+    others.insert(path, value);
+    QVector<HWND> invalids;
+    for (auto hwnd : hwndsHash.values(path)) {
+        if (IsWindow(hwnd)) {
+            SetWindowTransparency(hwnd, 255 * value / 100);
+        }
+        else {
+            invalids.append(hwnd);
+        }
+    }
+    for (auto hwnd : invalids) {
+        hwndsHash.remove(path, hwnd);
+        hwnds.remove(hwnd);
+    }
+}
+
+void TransMaster::sbTaskbarTimer()
+{
+    qDebug() << "sbTaskbarTimer " << ui.spinBox_taskbar->value();
 }
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
@@ -275,9 +338,61 @@ BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
     return TRUE; // 继续枚举其他窗口
 }
 
-void TransMaster::work()
+void TransMaster::workMode()
 {
     EnumWindows(EnumWindowsProc, 0);
+}
+
+void TransMaster::workWindow()
+{
+    auto currentActiveWindow = GetForegroundWindow();
+    //qDebug() << "Current Active Window: " << currentActiveWindow;
+    if (currentActiveWindow == nullptr) {
+        // 没有活动窗口，不做任何操作
+        return;
+    }
+    if (currentActiveWindow == self) {
+        // 自己就是当前活动窗口，不做任何操作
+        return;
+    }
+
+    WindowInfo wi = hwnds[currentActiveWindow];
+    // 获取当前活动窗口的标题
+    const int titleSize = 1024;
+    TCHAR  title[titleSize];
+    GetWindowText(currentActiveWindow, title, titleSize);
+    wi.title = QString::fromWCharArray(title);
+
+    if (wi.path.isEmpty()) {
+        // 获取当前活动窗口的执行文件路径
+        DWORD pid = 0;
+        GetWindowThreadProcessId(currentActiveWindow, &pid);
+        HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
+
+        if (processHandle != NULL) {
+            TCHAR  path[MAX_PATH];
+            if (GetModuleFileNameEx(processHandle, NULL, path, MAX_PATH) > 0) {
+                wi.path = QString::fromWCharArray(path);
+                hwndsHash.insert(wi.path, currentActiveWindow);
+            }
+            else {
+                qDebug() << "Failed to get current active window executable path." << currentActiveWindow << wi.title;
+            }
+            CloseHandle(processHandle);
+        }
+        else {
+            qDebug() << "Failed to open process for window." << currentActiveWindow << wi.title;
+        }
+
+        hwnds.insert(currentActiveWindow, wi);
+    }
+
+    //qDebug() << "Current Active Window: " << currentActiveWindow << wi.title << wi.path;
+
+    ui.label_last->setText(QString::number((int)currentActiveWindow, 8));
+    ui.label_title->setText(wi.title);
+    changePath(wi.path);
+    SetWindowTransparency(currentActiveWindow, 255 * ui.spinBox_current->value() / 100);
 }
 
 void TransMaster::readSettings()
