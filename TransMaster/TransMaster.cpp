@@ -64,6 +64,7 @@ bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintpt
             break;
         case 1:  // 呼出窗口
             workWindow();
+            timerWindow.start();
             show();
             raise();
             activateWindow();
@@ -198,6 +199,7 @@ UINT QtModifierToWinModifiers(Qt::KeyboardModifiers modifiers) {
     if (modifiers & Qt::AltModifier) {
         winModifiers |= MOD_ALT;
     }
+    //https://github.com/pbek/QOwnNotes/issues/1671 使用win键前按下其它修饰键
     if (modifiers & Qt::MetaModifier) {
         winModifiers |= MOD_WIN;
     }
@@ -256,10 +258,11 @@ void TransMaster::sbCurrentTimer()
         return;
     }
     others.insert(path, value);
+    value = 255 * value / 100;
     QVector<HWND> invalids;
     for (auto hwnd : hwndsHash.values(path)) {
         if (IsWindow(hwnd)) {
-            SetWindowTransparency(hwnd, 255 * value / 100);
+            SetWindowTransparency(hwnd, value);
         }
         else {
             invalids.append(hwnd);
@@ -273,7 +276,22 @@ void TransMaster::sbCurrentTimer()
 
 void TransMaster::sbTaskbarTimer()
 {
-    qDebug() << "sbTaskbarTimer " << ui.spinBox_taskbar->value();
+    auto value = ui.spinBox_taskbar->value();
+    qDebug() << "sbTaskbarTimer " << value;
+    value = 255 * value / 100;
+    QVector<HWND> tbs;
+    HWND taskbar = FindWindow(L"Shell_TrayWnd", NULL);
+    if (taskbar) {
+        tbs.append(taskbar);
+    }
+    taskbar = FindWindow(L"Shell_SecondaryTrayWnd", NULL);
+    while (taskbar) {
+        tbs.append(taskbar);
+        taskbar = FindWindowEx(NULL, taskbar, L"Shell_SecondaryTrayWnd", NULL);
+    }
+    for (auto hwnd : tbs) {
+        SetWindowTransparency(hwnd, value);
+    }
 }
 
 BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
