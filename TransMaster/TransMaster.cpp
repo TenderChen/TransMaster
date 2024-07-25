@@ -1,8 +1,6 @@
 ﻿#include "stdafx.h"
 #include "TransMaster.h"
-#include <optional>
 
-#include <Windows.h>
 #include <Psapi.h>
 
 TransMaster::TransMaster(QSettings& settings, QWidget* parent)
@@ -11,25 +9,44 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
 {
     ui.setupUi(this);
 
+    readSettings();
+
+    //系统图标
+    QIcon icon = QIcon::fromTheme(QIcon::ThemeIcon(appIcon));
+    setWindowIcon(icon);
+
+    //托盘区菜单
+    quitAction = new QAction(tr("&Quit"), this);
+    connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
+
+    trayIconMenu = new QMenu(this);
+    trayIconMenu->addAction(quitAction);
+
+    //托盘图标
+    trayIcon = new QSystemTrayIcon(this);
+    trayIcon->setContextMenu(trayIconMenu);
+    trayIcon->setIcon(icon);
+    trayIcon->show();
+
+    connect(trayIcon, &QSystemTrayIcon::activated, this, &TransMaster::iconActivated);
+
     self = reinterpret_cast<HWND>(this->winId());
 
     shortCutBtns.reserve(2);
     shortCutBtns.append(ui.keySequenceEdit_mode);
     shortCutBtns.append(ui.keySequenceEdit_window);
 
-    readSettings();
-
-    timerMode.setInterval(500);
-    connect(&timerMode, &QTimer::timeout, this, &TransMaster::workMode);
-
     connect(&timerWindow, &QTimer::timeout, this, &TransMaster::workWindow);
-    timerWindow.start(500);
+    timerWindow.start(ui.spinBox_scan->value());
 
     timerSbCurrent.setSingleShot(true);
     connect(&timerSbCurrent, &QTimer::timeout, this, &TransMaster::sbCurrentTimer);
 
     timerSbTaskbar.setSingleShot(true);
     connect(&timerSbTaskbar, &QTimer::timeout, this, &TransMaster::sbTaskbarTimer);
+
+    timerSbScan.setSingleShot(true);
+    connect(&timerSbScan, &QTimer::timeout, this, &TransMaster::sbScanTimer);
 }
 
 TransMaster::~TransMaster()
@@ -38,17 +55,60 @@ TransMaster::~TransMaster()
 
 void TransMaster::closeEvent(QCloseEvent* event)
 {
-    saveSettings();
-    event->accept();
+    if (!event->spontaneous() || !isVisible())
+        saveSettings();
+    return;
+    if (trayIcon->isVisible()) {
+        QMessageBox::information(this, tr("Systray"),
+            tr("The program will keep running in the "
+                "system tray. To terminate the program, "
+                "choose <b>Quit</b> in the context menu "
+                "of the system tray entry."));
+        hide();
+        event->ignore();
+    }
 }
+
+BOOL CALLBACK RestoreWindowTransparency(HWND hwnd, LPARAM lParam) {
+    // 移除 WS_EX_LAYERED 样式
+    SetWindowLong(hwnd, GWL_EXSTYLE, GetWindowLong(hwnd, GWL_EXSTYLE) & ~WS_EX_LAYERED);
+    // 恢复不透明度
+    SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+    // 重绘窗口
+    InvalidateRect(hwnd, NULL, TRUE);
+    UpdateWindow(hwnd);
+    return TRUE;
+}
+
+//void RestoreAllChildWindows(HWND parentHwnd) {
+//    EnumChildWindows(parentHwnd, RestoreWindowTransparency, 0);
+//}
 
 // 假设hWnd是你要操作的窗口句柄，bTransparency 0-255(不透明)
 void SetWindowTransparency(HWND hWnd, BYTE bTransparency) {
-    // 添加 WS_EX_LAYERED 扩展样式
-    SetWindowLong(hWnd, GWL_EXSTYLE, GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
-    // 设置透明度
-    SetLayeredWindowAttributes(hWnd, 0, bTransparency, LWA_ALPHA);
+    if (bTransparency >= 255) {
+        RestoreWindowTransparency(hWnd, bTransparency);
+    }
+    else {
+        // 添加 WS_EX_LAYERED 扩展样式
+        SetWindowLong(hWnd, GWL_EXSTYLE, GetWindowLong(hWnd, GWL_EXSTYLE) | WS_EX_LAYERED);
+        // 设置透明度
+        SetLayeredWindowAttributes(hWnd, 0, bTransparency, LWA_ALPHA);
+    }
 }
+
+/*void SetWindowTransparencyAll(HWND hwndMain, BYTE bTransparency) {
+    if (bTransparency >= 255) {
+        RestoreAllChildWindows(hwndMain);
+    }
+    else {
+        SetWindowTransparency(hwndMain, bTransparency);
+        EnumChildWindows(hwndMain, [](HWND hwnd, LPARAM lParam) -> BOOL {
+            SetWindowTransparency(hwnd, (BYTE)lParam);
+            return TRUE;
+            }, bTransparency);
+    }
+}*/
 
 bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintptr* result)
 {
@@ -77,15 +137,10 @@ bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintpt
     return QMainWindow::nativeEvent(eventType, message, result);
 }
 
-void TransMaster::on_comboBox_mode_currentIndexChanged(int index)
-{
-    if (index == 1) {
-        timerMode.start();
-    }
-    else {
-        timerMode.stop();
-    }
-}
+//void TransMaster::on_comboBox_mode_currentIndexChanged(int index)
+//{
+//    //
+//}
 
 UINT QtKeyToWinVirtualKey(Qt::Key key) {
     // 映射 Qt 键码到 Windows 虚拟键码，不含修饰键
@@ -226,6 +281,25 @@ void TransMaster::changePath(const QString& path)
     ui.spinBox_current->setValue(others.value(path, 100));
 }
 
+void TransMaster::on_checkBox_toggled(bool checked)
+{
+    ui.checkBox->setEnabled(false);
+    ui.comboBox_icon->clear();
+    for (int i = 0; i < (int)QIcon::ThemeIcon::NThemeIcons; i++) {
+        QString text = QString::number(i);
+        QIcon icon = QIcon::fromTheme(QIcon::ThemeIcon(i));
+        ui.comboBox_icon->addItem(icon, text);
+    }
+}
+
+void TransMaster::on_comboBox_icon_currentIndexChanged(int index)
+{
+    QIcon icon = ui.comboBox_icon->itemIcon(index);
+    trayIcon->setIcon(icon);
+    setWindowIcon(icon);
+    appIcon = ui.comboBox_icon->itemText(index).toInt();
+}
+
 void TransMaster::on_keySequenceEdit_mode_keySequenceChanged(const QKeySequence& keySequence)
 {
     onShortCutChanged(keySequence, 0);
@@ -246,15 +320,33 @@ void TransMaster::on_spinBox_taskbar_valueChanged(int value)
     timerSbTaskbar.start(300);
 }
 
+void TransMaster::on_spinBox_scan_valueChanged(int value)
+{
+    timerSbScan.start(300);
+}
+
+void TransMaster::iconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    switch (reason) {
+    case QSystemTrayIcon::Trigger:
+    case QSystemTrayIcon::DoubleClick:
+    case QSystemTrayIcon::MiddleClick:
+        show();
+        break;
+    default:
+        ;
+    }
+}
+
 void TransMaster::sbCurrentTimer()
 {
     auto value = ui.spinBox_current->value();
-    qDebug() << "sbCurrentTimer " << value;
+    //qDebug() << "sbCurrentTimer " << value;
     auto path = ui.label_path->text();
     if (path.isEmpty()) {
         return;
     }
-    if(value == others.value(path, 100)) {
+    if (value == others.value(path, 100)) {
         return;
     }
     others.insert(path, value);
@@ -277,7 +369,7 @@ void TransMaster::sbCurrentTimer()
 void TransMaster::sbTaskbarTimer()
 {
     auto value = ui.spinBox_taskbar->value();
-    qDebug() << "sbTaskbarTimer " << value;
+    //qDebug() << "sbTaskbarTimer " << value;
     value = 255 * value / 100;
     QVector<HWND> tbs;
     HWND taskbar = FindWindow(L"Shell_TrayWnd", NULL);
@@ -294,71 +386,14 @@ void TransMaster::sbTaskbarTimer()
     }
 }
 
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-    if (!IsWindowVisible(hwnd)) {
-        return TRUE; // 窗口不可见，继续枚举
-    }
-
-    // 检查窗口是否最小化
-    if (IsIconic(hwnd)) {
-        return TRUE; // 窗口已最小化，继续枚举
-    }
-
-    // 检查窗口边界是否被完全覆盖
-    RECT rect;
-    if (GetWindowRect(hwnd, &rect) && rect.right != rect.left && rect.bottom != rect.top) {
-        // 获取窗口标题
-        const int titleSize = 1024;
-        TCHAR  title[titleSize];
-        GetWindowText(hwnd, title, titleSize);
-        qDebug() << "Window Title: " << hwnd << QString::fromWCharArray(title);
-
-        // 获取执行文件路径
-        DWORD pid = 0;
-        GetWindowThreadProcessId(hwnd, &pid);
-        HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, pid);
-        if (processHandle != NULL) {
-            TCHAR  path[MAX_PATH];
-            if (GetModuleFileNameEx(processHandle, NULL, path, MAX_PATH) > 0) {
-                qDebug() << "Executable Path: " << QString::fromWCharArray(path);
-            }
-            else {
-                qDebug() << "Failed to get executable path.";
-            }
-            CloseHandle(processHandle);
-        }
-        else {
-            qDebug() << "Failed to open process for window.";
-        }
-
-        auto points = QVector<POINT>{
-            POINT{rect.left + 1, rect.top + 1},
-            POINT{rect.right - 1, rect.top + 1},
-            POINT{rect.left + 1, rect.bottom - 1},
-            POINT{rect.right - 1, rect.bottom - 1} };
-        BOOL covered = TRUE;
-        for (auto point : points) {
-            HWND hTop = WindowFromPoint(point);
-            qDebug() << hTop << hwnd << point.x << point.y;
-            if (hTop == hwnd) {
-                covered = FALSE;
-                break;
-            }
-        }
-        if (covered) {
-            qDebug() << hwnd << "Window is covered by other window.";
-            // 窗口边界被其他窗口覆盖
-            //ShowWindow(hwnd, SW_MINIMIZE);
-        }
-        return TRUE; // 继续枚举其他窗口
-    }
-
-    return TRUE; // 继续枚举其他窗口
+void TransMaster::sbScanTimer()
+{
+    timerWindow.start(ui.spinBox_scan->value());
 }
 
-void TransMaster::workMode()
-{
-    EnumWindows(EnumWindowsProc, 0);
+BOOL isCoveredBy(RECT rectSmall, RECT rectBig) {
+    //qDebug() << rectSmall.left << rectSmall.right << rectSmall.top << rectSmall.bottom << rectBig.left << rectBig.right << rectBig.top << rectBig.bottom;
+    return rectSmall.left >= rectBig.left && rectSmall.right <= rectBig.right && rectSmall.top >= rectBig.top && rectSmall.bottom <= rectBig.bottom;
 }
 
 void TransMaster::workWindow()
@@ -405,12 +440,32 @@ void TransMaster::workWindow()
         hwnds.insert(currentActiveWindow, wi);
     }
 
+    if (IsRectEmpty(&wi.rect)) {
+        // 获取当前活动窗口的边界
+        GetWindowRect(currentActiveWindow, &wi.rect);
+    }
+
+    hwnds.insert(currentActiveWindow, wi);
     //qDebug() << "Current Active Window: " << currentActiveWindow << wi.title << wi.path;
 
-    ui.label_last->setText(QString::number((int)currentActiveWindow, 8));
+    ui.label_last->setText(QString::number((qulonglong)currentActiveWindow, 8));
     ui.label_title->setText(wi.title);
     changePath(wi.path);
     SetWindowTransparency(currentActiveWindow, 255 * ui.spinBox_current->value() / 100);
+
+    if (ui.comboBox_mode->currentIndex() == 1 && !IsRectEmpty(&wi.rect)) {
+        qDebug() << "rect compare start: " << currentActiveWindow << wi.title << wi.path << wi.rect.left << wi.rect.right << wi.rect.top << wi.rect.bottom;
+        //最小化被当前主窗口覆盖的其它主窗口
+        for (auto i = hwnds.cbegin(), end = hwnds.cend(); i != end; ++i) {
+            auto rt = (i.key() != currentActiveWindow && IsWindowVisible(i.key()) && !IsIconic(i.key())
+                && !IsRectEmpty(&i.value().rect)
+                && isCoveredBy(i.value().rect, wi.rect));
+            qDebug() << "minimize: " << rt << i.key() << i.value().title << i.value().path << i.value().rect.left << i.value().rect.right << i.value().rect.top << i.value().rect.bottom;
+            if (rt) {
+                ShowWindow(i.key(), SW_MINIMIZE);
+            }
+        }
+    }
 }
 
 void TransMaster::readSettings()
@@ -419,6 +474,8 @@ void TransMaster::readSettings()
     sts->beginGroup("global");
     ui.comboBox_mode->setCurrentIndex(sts->value("mode", 0).toInt());
     ui.spinBox_taskbar->setValue(sts->value("taskbar", 100).toInt());
+    ui.spinBox_scan->setValue(sts->value("scan", 1000).toInt());
+    appIcon = sts->value("icon").toInt();
     sts->endGroup();
 
     //shortcuts
@@ -445,6 +502,8 @@ void TransMaster::saveSettings()
     sts->beginGroup("global");
     sts->setValue("mode", ui.comboBox_mode->currentIndex());
     sts->setValue("taskbar", ui.spinBox_taskbar->value());
+    sts->setValue("scan", ui.spinBox_scan->value());
+    sts->setValue("icon", appIcon);
     sts->endGroup();
 
     //shortcuts
@@ -458,8 +517,12 @@ void TransMaster::saveSettings()
     //others
     sts->beginGroup("others");
     for (auto key : others.keys()) {
-        if (others[key] < 100)
+        if (others[key] < 100) {
             sts->setValue(key, others[key]);
+        }
+        else {
+            sts->remove(key);
+        }
     }
     sts->endGroup();
 }
