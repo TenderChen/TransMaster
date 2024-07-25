@@ -436,8 +436,6 @@ void TransMaster::workWindow()
         else {
             qDebug() << "Failed to open process for window." << currentActiveWindow << wi.title;
         }
-
-        hwnds.insert(currentActiveWindow, wi);
     }
 
     if (IsRectEmpty(&wi.rect)) {
