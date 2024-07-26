@@ -8,7 +8,7 @@ int main(int argc, char* argv[])
 
     if (!QSystemTrayIcon::isSystemTrayAvailable()) {
         QMessageBox::critical(nullptr, QObject::tr("TransMaster"),
-            QObject::tr("ÕÒ²»µ½ÏµÍ³ÍĞÅÌ"));
+            QObject::tr("æ‰¾ä¸åˆ°ç³»ç»Ÿæ‰˜ç›˜"));
         return 1;
     }
     QApplication::setQuitOnLastWindowClosed(false);
