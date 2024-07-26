@@ -9,7 +9,12 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
 {
     ui.setupUi(this);
 
+    self = reinterpret_cast<HWND>(this->winId());
+
     readSettings();
+
+    //跳过任务栏窗口
+    sbTaskbarTimer();
 
     //系统图标
     QIcon icon = QIcon::fromTheme(QIcon::ThemeIcon(appIcon));
@@ -30,7 +35,7 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &TransMaster::iconActivated);
 
-    self = reinterpret_cast<HWND>(this->winId());
+    
 
     shortCutBtns.reserve(2);
     shortCutBtns.append(ui.keySequenceEdit_mode);
@@ -382,6 +387,7 @@ void TransMaster::sbTaskbarTimer()
         taskbar = FindWindowEx(NULL, taskbar, L"Shell_SecondaryTrayWnd", NULL);
     }
     for (auto hwnd : tbs) {
+        skipWindows.insert(hwnd);
         SetWindowTransparency(hwnd, value);
     }
 }
@@ -406,6 +412,10 @@ void TransMaster::workWindow()
     }
     if (currentActiveWindow == self) {
         // 自己就是当前活动窗口，不做任何操作
+        return;
+    }
+    if (skipWindows.contains(currentActiveWindow)) {
+        // 跳过任务栏等不方便处理的窗口
         return;
     }
 

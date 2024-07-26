@@ -71,6 +71,9 @@ private:
     //透明度调节后需要重新处理的窗口 使用前需要检查并同步清理hwnds
     QMultiHash<QString, HWND> hwndsHash;
 
+    //任务栏等不参与others记录的窗口
+    QSet<HWND> skipWindows;
+
     QAction* quitAction;
     QSystemTrayIcon* trayIcon;
     QMenu* trayIconMenu;
