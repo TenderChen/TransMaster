@@ -34,6 +34,7 @@ protected:
 private slots:
     //void on_comboBox_mode_currentIndexChanged(int index);
     void on_checkBox_toggled(bool checked);
+    void on_checkBox_scan_toggled(bool checked);
     void on_comboBox_icon_currentIndexChanged(int index);
     void on_keySequenceEdit_mode_keySequenceChanged(const QKeySequence& keySequence);
     void on_keySequenceEdit_window_keySequenceChanged(const QKeySequence& keySequence);
@@ -48,6 +49,7 @@ private slots:
     void sbScanTimer();
 
     void workWindow();
+    void quitRestore();
 
 private:
     void readSettings();
@@ -75,6 +77,7 @@ private:
     QSet<HWND> skipWindows;
 
     QAction* quitAction;
+    QAction* quitRestoreAction;
     QSystemTrayIcon* trayIcon;
     QMenu* trayIconMenu;
 };
