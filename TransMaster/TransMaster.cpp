@@ -21,9 +21,9 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
     setWindowIcon(icon);
 
     //托盘区菜单
-    quitAction = new QAction(tr("&Quit"), this);
+    quitAction = new QAction(tr("退出"), this);
     connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
-    quitRestoreAction = new QAction(tr("&QuitRestore"), this);
+    quitRestoreAction = new QAction(tr("恢复不透明退出"), this);
     connect(quitRestoreAction, &QAction::triggered, this, &TransMaster::quitRestore);
 
     trayIconMenu = new QMenu(this);
@@ -71,11 +71,8 @@ void TransMaster::closeEvent(QCloseEvent* event)
     return;
     }
     if (trayIcon->isVisible()) {
-        QMessageBox::information(this, tr("Systray"),
-            tr("The program will keep running in the "
-                "system tray. To terminate the program, "
-                "choose <b>Quit</b> in the context menu "
-                "of the system tray entry."));
+        QMessageBox::information(this, tr("TransMater"),
+            tr("托盘区运行及退出"));
         hide();
         event->ignore();
     }

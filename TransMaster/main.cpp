@@ -7,9 +7,8 @@ int main(int argc, char* argv[])
     QApplication a(argc, argv);
 
     if (!QSystemTrayIcon::isSystemTrayAvailable()) {
-        QMessageBox::critical(nullptr, QObject::tr("Systray"),
-            QObject::tr("I couldn't detect any system tray "
-                "on this system."));
+        QMessageBox::critical(nullptr, QObject::tr("TransMaster"),
+            QObject::tr("找不到系统托盘"));
         return 1;
     }
     QApplication::setQuitOnLastWindowClosed(false);
