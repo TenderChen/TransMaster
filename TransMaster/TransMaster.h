@@ -25,7 +25,10 @@ public:
     ~TransMaster();
 
 protected:
+    //关闭直接连带托盘区退出程序
     void closeEvent(QCloseEvent* event) override;
+    //最小化到托盘区
+    void changeEvent(QEvent* event) override;
     bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
 
     void onShortCutChanged(const QKeySequence& keySequence, int id);
@@ -49,6 +52,7 @@ private slots:
     void sbScanTimer();
 
     void workWindow();
+    void quitSave();
     void quitRestore();
 
 private:

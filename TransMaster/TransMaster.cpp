@@ -9,6 +9,10 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
 {
     ui.setupUi(this);
 
+    shortCutBtns.reserve(2);
+    shortCutBtns.append(ui.keySequenceEdit_mode);
+    shortCutBtns.append(ui.keySequenceEdit_window);
+
     self = reinterpret_cast<HWND>(this->winId());
 
     readSettings();
@@ -22,7 +26,7 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
 
     //托盘区菜单
     quitAction = new QAction(tr("退出"), this);
-    connect(quitAction, &QAction::triggered, qApp, &QCoreApplication::quit);
+    connect(quitAction, &QAction::triggered, this, &TransMaster::quitSave);
     quitRestoreAction = new QAction(tr("恢复不透明退出"), this);
     connect(quitRestoreAction, &QAction::triggered, this, &TransMaster::quitRestore);
 
@@ -37,12 +41,6 @@ TransMaster::TransMaster(QSettings& settings, QWidget* parent)
     trayIcon->show();
 
     connect(trayIcon, &QSystemTrayIcon::activated, this, &TransMaster::iconActivated);
-
-    
-
-    shortCutBtns.reserve(2);
-    shortCutBtns.append(ui.keySequenceEdit_mode);
-    shortCutBtns.append(ui.keySequenceEdit_window);
 
     timerWindow.setInterval(ui.spinBox_scan->value());
     connect(&timerWindow, &QTimer::timeout, this, &TransMaster::workWindow);
@@ -66,16 +64,17 @@ TransMaster::~TransMaster()
 
 void TransMaster::closeEvent(QCloseEvent* event)
 {
-    if (!event->spontaneous() || !isVisible()) {
-    saveSettings();
-    return;
+    quitSave();
+}
+
+void TransMaster::changeEvent(QEvent* event)
+{
+    if (event->type() == QEvent::WindowStateChange) {
+        if (isMinimized()) {
+            hide();
+        }
     }
-    if (trayIcon->isVisible()) {
-        QMessageBox::information(this, tr("TransMater"),
-            tr("托盘区运行及退出"));
-        hide();
-        event->ignore();
-    }
+    QMainWindow::changeEvent(event);
 }
 
 BOOL CALLBACK RestoreWindowTransparency(HWND hwnd, LPARAM lParam) {
@@ -487,6 +486,13 @@ void TransMaster::workWindow()
     }
 }
 
+void TransMaster::quitSave()
+{
+    saveSettings();
+
+    QCoreApplication::quit();
+}
+
 void TransMaster::quitRestore()
 {
     timerWindow.stop();
@@ -501,7 +507,7 @@ void TransMaster::quitRestore()
         RestoreWindowTransparency(hwnd, 0);
     }
 
-    QCoreApplication::quit();
+    quitSave();
 }
 
 void TransMaster::readSettings()
@@ -516,7 +522,7 @@ void TransMaster::readSettings()
 
     //shortcuts
     sts->beginGroup("shortcuts");
-    for (auto key : sts->allKeys()) {
+    for (auto& key : sts->allKeys()) {
         int i = key.toInt();
         if (i >= 0 && i < shortCutBtns.size())
             shortCutBtns[i]->setKeySequence(sts->value(key).toString());
@@ -526,7 +532,7 @@ void TransMaster::readSettings()
     //others
     sts->beginGroup("others");
     others.reserve(sts->allKeys().size());
-    for (auto key : sts->allKeys()) {
+    for (auto& key : sts->allKeys()) {
         others.insert(key, sts->value(key).toInt());
     }
     sts->endGroup();
@@ -552,7 +558,7 @@ void TransMaster::saveSettings()
 
     //others
     sts->beginGroup("others");
-    for (auto key : others.keys()) {
+    for (auto& key : others.keys()) {
         if (others[key] < 100) {
             sts->setValue(key, others[key]);
         }
