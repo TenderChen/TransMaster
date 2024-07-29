@@ -413,6 +413,14 @@ BOOL isCoveredBy(RECT rectSmall, RECT rectBig) {
     return rectSmall.left >= rectBig.left && rectSmall.right <= rectBig.right && rectSmall.top >= rectBig.top && rectSmall.bottom <= rectBig.bottom;
 }
 
+bool IsWindowTopMost(HWND hWnd) {
+    // 获取窗口的样式
+    LONG style = GetWindowLong(hWnd, GWL_EXSTYLE);
+
+    // 判断是否有 WS_EX_TOPMOST 标志
+    return (style & WS_EX_TOPMOST) != 0;
+}
+
 void TransMaster::workWindow()
 {
     auto currentActiveWindow = GetForegroundWindow();
@@ -471,7 +479,7 @@ void TransMaster::workWindow()
     changePath(wi.path);
     SetWindowTransparency(currentActiveWindow, 255 * ui.spinBox_current->value() / 100);
 
-    if (ui.checkBox_scan->isChecked() && ui.comboBox_mode->currentIndex() == 1 && !IsRectEmpty(&wi.rect)) {
+    if (ui.checkBox_scan->isChecked() && ui.comboBox_mode->currentIndex() == 1 && !IsRectEmpty(&wi.rect) && !IsWindowTopMost(currentActiveWindow)) {
         qDebug() << "rect compare start: " << currentActiveWindow << wi.title << wi.path << wi.rect.left << wi.rect.right << wi.rect.top << wi.rect.bottom;
         //最小化被当前主窗口覆盖的其它主窗口
         for (auto i = hwnds.cbegin(), end = hwnds.cend(); i != end; ++i) {
