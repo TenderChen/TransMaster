@@ -132,7 +132,7 @@ bool TransMaster::nativeEvent(const QByteArray& eventType, void* message, qintpt
             break;
         case 1:  // 呼出窗口
             workWindow();
-            show();
+            showNormal();
             activateWindow();
             break;
         default:
@@ -347,7 +347,8 @@ void TransMaster::iconActivated(QSystemTrayIcon::ActivationReason reason)
     case QSystemTrayIcon::Trigger:
     case QSystemTrayIcon::DoubleClick:
     case QSystemTrayIcon::MiddleClick:
-        show();
+        showNormal();
+        activateWindow();
         break;
     default:
         ;
@@ -479,16 +480,26 @@ void TransMaster::workWindow()
     changePath(wi.path);
     SetWindowTransparency(currentActiveWindow, 255 * ui.spinBox_current->value() / 100);
 
-    if (ui.checkBox_scan->isChecked() && ui.comboBox_mode->currentIndex() == 1 && !IsRectEmpty(&wi.rect) && !IsWindowTopMost(currentActiveWindow)) {
+    if (ui.checkBox_scan->isChecked() && ui.comboBox_mode->currentIndex() != 0 && !IsRectEmpty(&wi.rect) && !IsWindowTopMost(currentActiveWindow)) {
         qDebug() << "rect compare start: " << currentActiveWindow << wi.title << wi.path << wi.rect.left << wi.rect.right << wi.rect.top << wi.rect.bottom;
-        //最小化被当前主窗口覆盖的其它主窗口
+        //最小化/不透明 被当前主窗口覆盖的其它主窗口
         for (auto i = hwnds.cbegin(), end = hwnds.cend(); i != end; ++i) {
             auto rt = (i.key() != currentActiveWindow && IsWindowVisible(i.key()) && !IsIconic(i.key())
                 && !IsRectEmpty(&i.value().rect)
                 && isCoveredBy(i.value().rect, wi.rect));
-            qDebug() << "minimize: " << rt << i.key() << i.value().title << i.value().path << i.value().rect.left << i.value().rect.right << i.value().rect.top << i.value().rect.bottom;
+            qDebug() << "minimize/not transparent: " << rt << i.key() << i.value().title << i.value().path << i.value().rect.left << i.value().rect.right << i.value().rect.top << i.value().rect.bottom;
             if (rt) {
-                ShowWindow(i.key(), SW_SHOWMINIMIZED);
+                switch (ui.comboBox_mode->currentIndex())
+                {
+                case 1: // 单层覆盖
+                    ShowWindow(i.key(), SW_SHOWMINIMIZED);
+                    break;
+                case 2: // 单层透明
+                    RestoreWindowTransparency(i.key(), 0);
+                    break;
+                default:
+                    break;
+                }
             }
         }
     }
