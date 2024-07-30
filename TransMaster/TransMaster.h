@@ -33,6 +33,7 @@ protected:
 
     void onShortCutChanged(const QKeySequence& keySequence, int id);
     void changePath(const QString& path);
+    BOOL checkWindow(HWND hwnd);
 
 private slots:
     //void on_comboBox_mode_currentIndexChanged(int index);
@@ -44,6 +45,7 @@ private slots:
     void on_spinBox_current_valueChanged(int value);
     void on_spinBox_taskbar_valueChanged(int value);
     void on_spinBox_scan_valueChanged(int value);
+    void on_listWidget_itemDoubleClicked(QListWidgetItem* item);
 
     void iconActivated(QSystemTrayIcon::ActivationReason reason);
 
@@ -74,6 +76,7 @@ private:
     QTimer timerSbScan;
     //窗口-应用程序路径 不用重复获取
     QHash<HWND, WindowInfo> hwnds;
+    QHash<HWND, QListWidgetItem*> hwndItems;
     //透明度调节后需要重新处理的窗口 使用前需要检查并同步清理hwnds
     QMultiHash<QString, HWND> hwndsHash;
 

@@ -4,7 +4,7 @@
 #include <Psapi.h>
 
 TransMaster::TransMaster(QSettings& settings, QWidget* parent)
-    : QMainWindow(parent)
+    : QMainWindow(parent, Qt::WindowStaysOnTopHint)
     , sts(&settings)
 {
     ui.setupUi(this);
@@ -287,6 +287,24 @@ void TransMaster::changePath(const QString& path)
     ui.spinBox_current->setValue(others.value(path, 100));
 }
 
+BOOL TransMaster::checkWindow(HWND hwnd)
+{
+    auto rt = IsWindow(hwnd);
+    if (!rt) {
+        if (hwnds.contains(hwnd)) {
+            hwndsHash.remove(hwnds[hwnd].path, hwnd);
+            hwnds.remove(hwnd);
+        }
+        if (hwndItems.contains(hwnd)) {
+            auto item = hwndItems[hwnd];
+            ui.listWidget->takeItem(ui.listWidget->row(item));
+            hwndItems.remove(hwnd);
+            delete item;
+        }
+    }
+    return rt;
+}
+
 void TransMaster::on_checkBox_toggled(bool checked)
 {
     ui.checkBox->setEnabled(false);
@@ -341,6 +359,15 @@ void TransMaster::on_spinBox_scan_valueChanged(int value)
     timerSbScan.start();
 }
 
+void TransMaster::on_listWidget_itemDoubleClicked(QListWidgetItem* item)
+{
+    auto hwnd = (HWND)(item->text().split(" - ")[0].toULongLong(nullptr, 16));
+    if (checkWindow(hwnd)) {
+        // 切换到窗口
+        SwitchToThisWindow(hwnd, TRUE);
+    }
+}
+
 void TransMaster::iconActivated(QSystemTrayIcon::ActivationReason reason)
 {
     switch (reason) {
@@ -370,7 +397,7 @@ void TransMaster::sbCurrentTimer()
     value = 255 * value / 100;
     QVector<HWND> invalids;
     for (auto hwnd : hwndsHash.values(path)) {
-        if (IsWindow(hwnd)) {
+        if (checkWindow(hwnd)) {
             SetWindowTransparency(hwnd, value);
         }
         else {
@@ -380,6 +407,8 @@ void TransMaster::sbCurrentTimer()
     for (auto hwnd : invalids) {
         hwndsHash.remove(path, hwnd);
         hwnds.remove(hwnd);
+
+        hwndItems.remove(hwnd);
     }
 }
 
@@ -420,6 +449,32 @@ bool IsWindowTopMost(HWND hWnd) {
 
     // 判断是否有 WS_EX_TOPMOST 标志
     return (style & WS_EX_TOPMOST) != 0;
+}
+
+// 函数：从HWND获取图标，并转换为QIcon
+QIcon iconFromHWND(HWND hwnd) {
+    HICON hIcon = nullptr;
+
+    // 尝试获取大图标
+    SendMessage(hwnd, WM_GETICON, ICON_BIG, (LPARAM)&hIcon);
+    if (!hIcon) {
+        // 如果没有大图标，尝试获取小图标
+        SendMessage(hwnd, WM_GETICON, ICON_SMALL, (LPARAM)&hIcon);
+    }
+    if (!hIcon) {
+        // 如果还是没有图标，尝试从类信息中获取
+        hIcon = (HICON)GetClassLongPtr(hwnd, GCLP_HICON);
+    }
+
+    if (hIcon) {
+        // 将HICON转换为QPixmap
+        QPixmap pixmap = QPixmap::fromImage(QImage::fromHICON(hIcon));
+        if (!pixmap.isNull()) {
+            return QIcon(pixmap);
+        }
+    }
+
+    return QIcon();
 }
 
 void TransMaster::workWindow()
@@ -475,10 +530,24 @@ void TransMaster::workWindow()
     hwnds.insert(currentActiveWindow, wi);
     //qDebug() << "Current Active Window: " << currentActiveWindow << wi.title << wi.path;
 
-    ui.label_last->setText(QString::number((qulonglong)currentActiveWindow, 8));
+    QString key = QString::number((qulonglong)currentActiveWindow, 16);
+    ui.label_last->setText(key);
     ui.label_title->setText(wi.title);
     changePath(wi.path);
     SetWindowTransparency(currentActiveWindow, 255 * ui.spinBox_current->value() / 100);
+
+    //更新list
+    auto item = hwndItems[currentActiveWindow];
+    QString text = key + " - " + wi.title;
+    if (item == nullptr) { //末尾添加
+        item = new QListWidgetItem(iconFromHWND(currentActiveWindow), text, ui.listWidget);
+        hwndItems.insert(currentActiveWindow, item);
+    }
+    else { //移到末尾
+        item->setText(text);
+        ui.listWidget->addItem(ui.listWidget->takeItem(ui.listWidget->row(item)));
+    }
+    ui.listWidget->setCurrentItem(item);
 
     if (ui.checkBox_scan->isChecked() && ui.comboBox_mode->currentIndex() != 0 && !IsRectEmpty(&wi.rect) && !IsWindowTopMost(currentActiveWindow)) {
         qDebug() << "rect compare start: " << currentActiveWindow << wi.title << wi.path << wi.rect.left << wi.rect.right << wi.rect.top << wi.rect.bottom;
