@@ -289,7 +289,7 @@ void TransMaster::changePath(const QString& path)
 
 BOOL TransMaster::checkWindow(HWND hwnd)
 {
-    auto rt = IsWindow(hwnd);
+    auto rt = IsWindow(hwnd) && IsWindowVisible(hwnd);
     if (!rt) {
         if (hwnds.contains(hwnd)) {
             hwndsHash.remove(hwnds[hwnd].path, hwnd);
@@ -479,6 +479,11 @@ QIcon iconFromHWND(HWND hwnd) {
 
 void TransMaster::workWindow()
 {
+    //清理listWidget中的无效窗口
+    for (auto k : hwndItems.keys()) {
+        checkWindow(k);
+    }
+
     auto currentActiveWindow = GetForegroundWindow();
     //qDebug() << "Current Active Window: " << currentActiveWindow;
     if (currentActiveWindow == nullptr) {
