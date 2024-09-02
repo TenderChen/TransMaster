@@ -499,13 +499,21 @@ void TransMaster::workWindow()
         return;
     }
 
-    WindowInfo wi = hwnds[currentActiveWindow];
+    
 
     // 获取当前活动窗口的标题
     const int titleSize = 1024;
     TCHAR  title[titleSize];
     GetWindowText(currentActiveWindow, title, titleSize);
-    wi.title = QString::fromWCharArray(title);
+    QString titleStr = QString::fromWCharArray(title);
+
+    if (titleStr.isEmpty()) {
+        //跳过无标题的特殊窗口
+        return;
+    }
+
+    WindowInfo wi = hwnds[currentActiveWindow];
+    wi.title = titleStr;
 
     // 获取当前活动窗口的边界
     GetWindowRect(currentActiveWindow, &wi.rect);
